@@ -1,0 +1,19 @@
+{
+  "name": "rubry-agents",
+  "description": "Your agents, on Mastra: an OpenAI-compatible server reached only through the middleware.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8788",
+    "deploy": "wrangler deploy",
+    "check": "tsc --noEmit && wrangler deploy --dry-run",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "@rubrion/mastra-cloudflare": "^0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "wrangler": "^4.151.3"
+  }
+}

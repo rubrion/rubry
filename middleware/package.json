@@ -1,0 +1,17 @@
+{
+  "name": "rubry-middleware",
+  "description": "The public face of your agents: API keys, provider config, an OpenAI-compatible endpoint, and the config page.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "deploy": "wrangler d1 migrations apply rubry-config --remote && wrangler deploy",
+    "migrate:local": "wrangler d1 migrations apply rubry-config --local",
+    "check": "tsc --noEmit && wrangler deploy --dry-run",
+    "types": "wrangler types"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "wrangler": "^4.151.3"
+  }
+}

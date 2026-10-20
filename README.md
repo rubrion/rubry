@@ -1,120 +1,51 @@
-# rubot
+# rubry
 
-A scaffold for building multi-agent applications. Same wire contract,
-structured logging, and trace propagation pattern. Generic placeholders — fork once, fill in your domain.
-
-## What you get
+A template for your own multi-agent assistant, on [Cloudflare Workers](https://workers.cloudflare.com) and [Mastra](https://mastra.ai). Write agents and tools in TypeScript and get an OpenAI-compatible endpoint you can use from [rubry.ai](https://rubry.ai/chat), Open WebUI, or your own app. It runs on Workers AI out of the box, with no model keys; switch to any OpenAI-compatible provider on its settings page.
 
 ```
-rubot/
-├── workers/
-│   ├── rubot-gateway/        CF Worker — edge entry, mints trace_id, auth
-│   └── rubot-middleware/     CF Worker — data/provider proxy, identity ops
-├── agents/
-│   ├── rubot-orchestrator/   FastAPI — LLM-planner router across agents
-│   └── rubot-agent-template/ FastAPI — fork target for specialist agents
-├── shared-packages/
-│   └── packages/
-│       ├── rubot-config/     Python — BaseAgent + YAML config + agent_log schema
-│       ├── rubot-logger/     Python — envelope logging + FastAPI middleware
-│       └── rubot-logger-ts/  TS — same for CF Workers (Hono middleware)
-├── chat-source/              placeholder for your messaging adapter
-├── docs/                     English guides
-└── scripts/                  bootstrap + project-rename helpers
+client (rubry.ai, Open WebUI, your app)
+   │  Authorization: Bearer rk_…        OpenAI-compatible /v1
+   ▼
+middleware/  Worker   API keys · provider (key encrypted) · agents on/off · settings page
+   │  service binding: provider, agents on, session id as headers
+   ▼
+agents/      Worker   your Mastra agents and tools · "auto" routing · D1 memory
+   │
+   ▼
+Workers AI (built in), or any OpenAI-compatible provider (OpenAI, OpenRouter, LiteLLM/vLLM/Ollama…)
 ```
 
-## Architecture in 30 seconds
+- **`agents/`**: your agents. Each is a few lines of config in `src/agents/`; tools go in `src/tools/`. The server comes from [`@rubrion/mastra-cloudflare`](https://github.com/rubrion/mastra-cloudflare), the only dependency.
+- **`middleware/`**: the only public Worker, with no dependencies. It checks API keys, holds the provider config in D1, and serves the settings page (`client/`).
 
-```
-chat-source (WhatsApp/Telegram/Slack/...)
-    │
-    ▼  HTTP /v1/chat/completions + Bearer GATEWAY_API_KEY
-                                  + X-Chat-Source-{Session,Sender}-Id
-rubot-gateway (CF Worker)
-    │  mints X-Rubot-Trace-Id
-    │  resolves sender → tenant_id + short-lived data bearer (mbr.v1.*)
-    │
-    ▼  + X-Tenant-Id, X-Rubot-Data-Bearer, X-Rubot-Trace-Id
-rubot-orchestrator (FastAPI)
-    │  preflight /api/data/<tenant>/connections
-    │  fetch /v1/capabilities from each registered agent
-    │  LLM planner picks agent(s) to dispatch
-    │
-    ▼  fans out to specialist agents
-rubot-agent-template (your fork)
-    │  pydantic_ai Agent, tools call rubot-middleware
-    │
-    ▼
-rubot-middleware (CF Worker)
-    │  /api/example-provider/data/<tenant>/...
-    │  /api/internal/{bind-session,refresh-bearer}
-    ▼
-your upstream data sources
-```
-
-Every hop carries `X-Rubot-Trace-Id`. Every log line is a JSON envelope with
-the same fields. Filter by `trace_id` in your log aggregator (Axiom, Datadog,
-ClickHouse, …) and you see one request's full lifecycle.
+Ask for `model: "auto"` and a planner sends each message to the agent(s) whose description fits, splitting a request across up to three agents when it has distinct parts. Ask for an agent id to talk to it directly.
 
 ## Quick start
 
-```bash
-cd rubot
-
-# 1. Bootstrap Python venv + editable installs of rubot-config and rubot-logger.
-./scripts/dev-setup.sh rubot-agent-template
-
-# 2. Boot the template agent.
-source .venv/bin/activate
-cd agents/rubot-agent-template
-uvicorn app.main:app --reload --port 8000
-
-# 3. In another terminal, hit it.
-curl -X POST http://localhost:8000/v1/chat/completions \
-  -H "X-Tenant-Id: dev-tenant" \
-  -H "X-Rubot-Data-Bearer: fake-bearer-for-local" \
-  -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"user","content":"hello"}]}'
-```
-
-Watch the stdout JSON envelopes. Note `trace_id` is the same across all
-events from one request.
-
-## Rename rubot → your project
+Needs Node 20+ and a Cloudflare account (the free plan is enough).
 
 ```bash
-./scripts/init-project.sh acme-bot
+git clone https://github.com/rubrion/rubry my-agents && cd my-agents
+npm install
+cp middleware/.dev.vars.example middleware/.dev.vars   # fill ADMIN_TOKEN and SECRET_KEY
+npm run dev                                            # both Workers on http://localhost:8787
 ```
 
-Does a global find-replace across file names, module names, and string
-literals: `rubot` → `acme-bot`, `rubot_*` → `acme_bot_*`, `Rubot` →
-`AcmeBot`, `RUBOT` → `ACME_BOT`. Review the diff before committing.
-
-## Forking a new specialist agent
+Open http://localhost:8787, sign in with your `ADMIN_TOKEN` and create an API key (agents run on Workers AI until you set a provider there). Then:
 
 ```bash
-cp -r agents/rubot-agent-template agents/my-agent
-# edit app/agent/<name>_agent.py, app/agent/tools.py, app/prompt.txt, app/main.py
+curl -N http://localhost:8787/v1/chat/completions \
+  -H "Authorization: Bearer rk_…" -H "Content-Type: application/json" \
+  -d '{"model":"auto","stream":true,"messages":[{"role":"user","content":"Write a 6-word slogan for a bike shop"}]}'
 ```
 
-Full checklist: [`docs/creating-new-agent.md`](docs/creating-new-agent.md).
+## Next
 
-## Built with rubot
+- [Agents and tools](docs/agents.md): add an agent, a tool, a per-agent model, memory.
+- [Deploy](docs/deploy.md): D1 databases, secrets, `npm run deploy`.
+- [Connect](docs/connect.md): rubry.ai, Open WebUI, the OpenAI SDK.
+- [API](docs/api.md): endpoints and headers.
 
-Projects forked from this scaffold:
+## License
 
-- **brad** — a marketing-consultant agent suite (briefing, banner, post,
-  insights) with a per-tenant brand kit and Workers AI image generation.
-  _Private repo._
-
-Built something on rubot? Open a PR adding it here.
-
-## Docs
-
-| Doc | What |
-|---|---|
-| [`docs/architecture.md`](docs/architecture.md) | Layers, request lifecycle, security model |
-| [`docs/local-dev.md`](docs/local-dev.md) | Bootstrap, editable installs, Docker build modes |
-| [`docs/creating-new-agent.md`](docs/creating-new-agent.md) | Fork checklist for new specialists |
-| [`docs/deploy.md`](docs/deploy.md) | Railway + Cloudflare deploy notes |
-| [`docs/env-vars.md`](docs/env-vars.md) | Env var matrix per service |
+GPL-3.0. See [LICENSE](LICENSE).

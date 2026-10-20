@@ -1,0 +1,5 @@
+# Copy to .dev.vars for `npm run dev`. Generate each with: openssl rand -hex 32
+ADMIN_TOKEN=
+SECRET_KEY=
+# Optional: same value in agents/.dev.vars
+AGENTS_API_KEY=

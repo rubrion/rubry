@@ -1,0 +1,12 @@
+{
+  "name": "rubry",
+  "description": "Build your own multi-agent assistant on Cloudflare Workers and Mastra, and connect it to rubry.ai.",
+  "private": true,
+  "license": "GPL-3.0-only",
+  "workspaces": ["agents", "middleware"],
+  "scripts": {
+    "dev": "npm run migrate:local -w middleware && cd middleware && wrangler dev -c wrangler.jsonc -c ../agents/wrangler.jsonc --port 8787",
+    "check": "npm run check -w agents && npm run check -w middleware",
+    "deploy": "npm run deploy -w agents && npm run deploy -w middleware"
+  }
+}
