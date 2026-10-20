@@ -8,7 +8,24 @@
 //   /api/*                             the config page's API (ADMIN_TOKEN)
 //   everything else                    the config page (client/)
 import { sameSecret } from './crypto';
-import { checkKey, clearProvider, createKey, deleteKey, getDisabled, getProvider, hasProviderKey, listKeys, setDisabled, setProvider, touchKey } from './store';
+import {
+	checkKey,
+	clearProvider,
+	countKeys,
+	createKey,
+	deleteKey,
+	DEMO,
+	getDisabled,
+	getProvider,
+	hasProviderKey,
+	isDemo,
+	listKeys,
+	pruneDemo,
+	setDisabled,
+	setProvider,
+	takeDemo,
+	touchKey,
+} from './store';
 
 const json = (data: unknown, status = 200, headers: HeadersInit = {}) =>
 	new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', ...headers } });
@@ -38,9 +55,11 @@ async function openai(request: Request, env: Env, ctx: ExecutionContext, path: s
 	const keyId = await checkKey(env, bearer(request));
 	if (!keyId) return json({ error: { message: 'Invalid API key', type: 'invalid_request_error', code: 'invalid_api_key' } }, 401, CORS);
 	ctx.waitUntil(touchKey(env, keyId));
+	if (isDemo(env) && request.method === 'POST' && !(await takeDemo(env, keyId)))
+		return json({ error: { message: `Demo limit reached: ${DEMO.perKey} requests per key a day. Deploy your own to go further.`, type: 'rate_limit_error', code: 'demo_limit' } }, 429, CORS);
 
-	// No provider set: the agents Worker falls back to Workers AI.
-	const provider = await getProvider(env);
+	// No provider set (always, in demo mode): the agents Worker falls back to Workers AI.
+	const provider = isDemo(env) ? null : await getProvider(env);
 	const disabled = new Set(await getDisabled(env));
 	const on = (await agentIds(env)).filter((id) => !disabled.has(id));
 
@@ -61,8 +80,14 @@ async function openai(request: Request, env: Env, ctx: ExecutionContext, path: s
 
 async function admin(request: Request, env: Env, path: string) {
 	if (!env.ADMIN_TOKEN) return json({ error: 'ADMIN_TOKEN is not set' }, 503);
+	// A public sandbox publishes its admin token on the sign-in screen.
+	if (path === '/api/demo') return json(isDemo(env) ? { demo: true, adminToken: env.ADMIN_TOKEN } : { demo: false });
 	if (!(await sameSecret(bearer(request), env.ADMIN_TOKEN))) return json({ error: 'unauthorized' }, 401);
 	const body = request.method === 'POST' || request.method === 'PUT' ? ((await request.json().catch(() => ({}))) as Record<string, unknown>) : {};
+	const demo = isDemo(env);
+	// The sandbox's admin token is public: only keys can be made there.
+	if (demo && (path === '/api/provider' || path === '/api/agents') && request.method !== 'GET')
+		return json({ error: 'This is a public demo: the provider and agents are fixed. Deploy your own to change them.' }, 403);
 
 	if (path === '/api/config' && request.method === 'GET') {
 		const [provider, hasKey, disabled, keys, models] = await Promise.all([
@@ -76,10 +101,12 @@ async function admin(request: Request, env: Env, path: string) {
 				.catch(() => []),
 		]);
 		return json({
+			demo: demo ? DEMO : null,
 			endpoint: `${new URL(request.url).origin}/v1`,
 			provider: provider ? { baseURL: provider.baseURL, model: provider.model, hasKey } : null,
 			agents: models.map((m) => ({ id: m.id, name: m.name, description: m.description, enabled: !disabled.includes(m.id) })),
-			keys,
+			// In the demo everyone shares one admin token: don't list each other's keys.
+			keys: demo ? [] : keys,
 			secretKeySet: !!env.SECRET_KEY,
 		});
 	}
@@ -105,11 +132,15 @@ async function admin(request: Request, env: Env, path: string) {
 
 	if (path === '/api/keys' && request.method === 'POST') {
 		const name = String(body.name ?? '').trim().slice(0, 60) || 'API key';
+		if (demo) {
+			await pruneDemo(env);
+			if ((await countKeys(env)) >= DEMO.maxKeys) return json({ error: 'The demo is full right now. Try again later, or deploy your own.' }, 429);
+		}
 		return json(await createKey(env, name));
 	}
 
 	const del = path.match(/^\/api\/keys\/([\w-]+)$/);
-	if (del && request.method === 'DELETE') {
+	if (del && request.method === 'DELETE' && !demo) {
 		await deleteKey(env, del[1]);
 		return json({ ok: true });
 	}

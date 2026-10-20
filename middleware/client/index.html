@@ -17,12 +17,14 @@
 			<form id="signin" class="card">
 				<h2>Sign in</h2>
 				<p class="muted">Use the <code>ADMIN_TOKEN</code> you set as a secret on this Worker.</p>
+				<p class="demo" id="demo-token" hidden></p>
 				<label>Admin token <input type="password" name="token" autocomplete="current-password" required /></label>
 				<button type="submit">Sign in</button>
 				<p class="error" id="signin-error" role="alert"></p>
 			</form>
 
 			<div id="app" hidden>
+				<p class="demo" id="demo-note" hidden></p>
 				<section class="card">
 					<h2>Your endpoint</h2>
 					<p class="muted">An OpenAI-compatible API: any client that takes a base URL and an API key can use your agents.</p>

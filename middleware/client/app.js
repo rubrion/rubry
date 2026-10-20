@@ -30,6 +30,11 @@ function signOut() {
 const when = (iso) => (iso ? new Date(iso).toLocaleString() : 'never');
 
 function render(config) {
+	const demo = !!config.demo;
+	$('demo-note').hidden = !demo;
+	if (demo)
+		$('demo-note').textContent = `Public demo: agents run on the built-in model. Keys last ${config.demo.keyHours} hours and ${config.demo.perKey} messages a day. Deploy your own to set a provider and turn agents on or off.`;
+	for (const el of $('provider').elements) el.disabled = demo;
 	$('endpoint').textContent = config.endpoint;
 	const form = $('provider');
 	form.baseURL.value = config.provider?.baseURL ?? '';
@@ -51,6 +56,7 @@ function render(config) {
 			li.querySelector('small').textContent = a.description;
 			const box = li.querySelector('input');
 			box.checked = a.enabled;
+			box.disabled = demo;
 			box.dataset.id = a.id;
 			box.addEventListener('change', saveAgents);
 			return li;
@@ -145,5 +151,18 @@ document.addEventListener('click', async (e) => {
 	e.target.textContent = 'Copied';
 	setTimeout(() => (e.target.textContent = 'Copy'), 1500);
 });
+
+// A public sandbox shows its admin token here.
+fetch('/api/demo')
+	.then((r) => r.json())
+	.then((d) => {
+		if (!d.demo) return;
+		const p = $('demo-token');
+		p.hidden = false;
+		p.innerHTML = 'Public demo: the admin token is <code></code>.';
+		p.querySelector('code').textContent = d.adminToken;
+		$('signin').token.value = d.adminToken;
+	})
+	.catch(() => {});
 
 if (token) load();

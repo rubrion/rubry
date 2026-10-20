@@ -1,4 +1,4 @@
-// Settings and API keys, in D1 (migrations/0001_init.sql).
+// Settings, API keys and demo usage, in D1 (migrations/).
 import { decrypt, encrypt, randomToken, sha256 } from './crypto';
 
 export interface Provider {
@@ -67,10 +67,43 @@ export async function deleteKey(env: Env, id: string) {
 	await env.DB.prepare('DELETE FROM api_keys WHERE id = ?1').bind(id).run();
 }
 
-/** The key's id when it is valid. */
+/** The key's id when it is valid (in demo mode, for a day after it was made). */
 export async function checkKey(env: Env, key: string) {
 	if (!key.startsWith('rk_')) return null;
-	return (await env.DB.prepare('SELECT id FROM api_keys WHERE hash = ?1').bind(await sha256(key)).first<{ id: string }>())?.id ?? null;
+	const row = await env.DB.prepare('SELECT id, created_at FROM api_keys WHERE hash = ?1').bind(await sha256(key)).first<{ id: string; created_at: string }>();
+	if (!row) return null;
+	if (isDemo(env) && Date.now() - Date.parse(row.created_at) > DEMO.keyHours * 3600_000) return null;
+	return row.id;
+}
+
+// Demo mode: a public sandbox with a published ADMIN_TOKEN.
+export const DEMO = { keyHours: 24, perKey: 30, perDay: 1000, maxKeys: 200 };
+export const isDemo = (env: Env) => env.DEMO_MODE === 'true';
+
+/** Count one request for the key; false when the key's or the day's cap is reached. */
+export async function takeDemo(env: Env, keyId: string) {
+	const day = new Date().toISOString().slice(0, 10);
+	const total = await env.DB.prepare('SELECT COALESCE(SUM(n), 0) AS n FROM usage WHERE day = ?1').bind(day).first<{ n: number }>();
+	if ((total?.n ?? 0) >= DEMO.perDay) return false;
+	const row = await env.DB.prepare(
+		'INSERT INTO usage (day, key_id, n) VALUES (?1, ?2, 1) ON CONFLICT (day, key_id) DO UPDATE SET n = n + 1 WHERE n < ?3 RETURNING n',
+	)
+		.bind(day, keyId, DEMO.perKey)
+		.first<{ n: number }>();
+	return row !== null;
+}
+
+/** Drop expired demo keys (and old usage rows). */
+export async function pruneDemo(env: Env) {
+	const cutoff = new Date(Date.now() - DEMO.keyHours * 3600_000).toISOString();
+	await env.DB.batch([
+		env.DB.prepare('DELETE FROM api_keys WHERE created_at < ?1').bind(cutoff),
+		env.DB.prepare('DELETE FROM usage WHERE day < ?1').bind(cutoff.slice(0, 10)),
+	]);
+}
+
+export async function countKeys(env: Env) {
+	return (await env.DB.prepare('SELECT COUNT(*) AS n FROM api_keys').first<{ n: number }>())?.n ?? 0;
 }
 
 export function touchKey(env: Env, id: string) {
