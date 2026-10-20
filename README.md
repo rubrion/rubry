@@ -39,7 +39,11 @@ curl -N http://localhost:8787/v1/chat/completions \
   -d '{"model":"auto","stream":true,"messages":[{"role":"user","content":"Write a 6-word slogan for a bike shop"}]}'
 ```
 
+Try it without installing anything first: take a key at [example.rubry.ai](https://example.rubry.ai) (a public demo of this template) and connect it on [rubry.ai/chat](https://rubry.ai/chat).
+
 ## Next
+
+Full guides, with screenshots: **[docs.rubry.ai](https://docs.rubry.ai)**. In this repo:
 
 - [Agents and tools](docs/agents.md): add an agent, a tool, a per-agent model, memory.
 - [Deploy](docs/deploy.md): D1 databases, secrets, `npm run deploy`.
