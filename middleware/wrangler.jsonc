@@ -1,0 +1,20 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "rubry-middleware",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-09-01",
+	// Public at https://rubry-middleware.<your-subdomain>.workers.dev; add
+	// "routes" for a custom domain.
+	"workers_dev": true,
+	"preview_urls": false,
+	"observability": { "enabled": true },
+	// The config page (client/) is served as static assets; the API routes
+	// run the Worker first.
+	"assets": { "directory": "./client", "binding": "ASSETS", "run_worker_first": ["/v1/*", "/api/*"] },
+	"d1_databases": [
+		// Settings and API keys. Create it with: npx wrangler d1 create rubry-config
+		{ "binding": "DB", "database_name": "rubry-config", "database_id": "REPLACE_WITH_DATABASE_ID", "migrations_dir": "migrations" }
+	],
+	// The agents Worker, reached privately.
+	"services": [{ "binding": "AGENTS", "service": "rubry-agents" }]
+}

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<title>Agent settings</title>
+		<link rel="stylesheet" href="/style.css" />
+	</head>
+	<body>
+		<main class="page">
+			<header class="top">
+				<h1>Agent settings</h1>
+				<button type="button" class="ghost" id="signout" hidden>Sign out</button>
+			</header>
+
+			<form id="signin" class="card">
+				<h2>Sign in</h2>
+				<p class="muted">Use the <code>ADMIN_TOKEN</code> you set as a secret on this Worker.</p>
+				<label>Admin token <input type="password" name="token" autocomplete="current-password" required /></label>
+				<button type="submit">Sign in</button>
+				<p class="error" id="signin-error" role="alert"></p>
+			</form>
+
+			<div id="app" hidden>
+				<section class="card">
+					<h2>Your endpoint</h2>
+					<p class="muted">An OpenAI-compatible API: any client that takes a base URL and an API key can use your agents.</p>
+					<div class="copy-row"><code id="endpoint"></code><button type="button" class="ghost" data-copy="endpoint">Copy</button></div>
+					<details>
+						<summary>Connect it to rubry.ai</summary>
+						<ol>
+							<li>Create an API key below.</li>
+							<li>On <a href="https://rubry.ai/chat" target="_blank" rel="noopener">rubry.ai/chat</a>, open the agent menu and pick <b>Connect your agent</b>.</li>
+							<li>Paste this endpoint and the key. Your agent joins the menu; it runs on your provider, not on Rubry's limits.</li>
+						</ol>
+					</details>
+				</section>
+
+				<form class="card" id="provider">
+					<h2>Model provider</h2>
+					<p class="muted">Until you set one, your agents run on Workers AI, with no key needed. Or use any OpenAI-compatible endpoint: OpenAI, OpenRouter, a self-hosted LiteLLM/vLLM/Ollama.</p>
+					<p class="state" id="provider-state"></p>
+					<label>Preset
+						<select name="preset">
+							<option value="">Custom</option>
+							<option value="https://api.openai.com/v1|gpt-5-mini">OpenAI</option>
+							<option value="https://openrouter.ai/api/v1|openai/gpt-5-mini">OpenRouter</option>
+							<option value="https://api.cloudflare.com/client/v4/accounts/ACCOUNT_ID/ai/v1|@cf/mistralai/mistral-small-3.1-24b-instruct">Workers AI</option>
+						</select>
+					</label>
+					<label>Base URL <input name="baseURL" type="url" placeholder="https://api.openai.com/v1" required /></label>
+					<label>Model <input name="model" placeholder="gpt-5-mini" required /></label>
+					<label>API key <input name="apiKey" type="password" autocomplete="off" placeholder="sk-…" /></label>
+					<p class="muted small" id="key-state"></p>
+					<div class="row">
+						<button type="submit">Save provider</button>
+						<button type="button" class="ghost" id="builtin" hidden>Use built-in Workers AI</button>
+					</div>
+					<p class="note" id="provider-note" role="status"></p>
+				</form>
+
+				<section class="card">
+					<h2>Agents</h2>
+					<p class="muted">Turned-off agents disappear from <code>/v1/models</code> and from <code>auto</code> routing. Add agents in <code>agents/src/agents/</code>.</p>
+					<ul class="agents" id="agents"></ul>
+				</section>
+
+				<section class="card">
+					<h2>API keys</h2>
+					<form class="inline" id="new-key">
+						<input name="name" placeholder="Name, e.g. rubry.ai" maxlength="60" />
+						<button type="submit">Create key</button>
+					</form>
+					<div class="reveal" id="reveal" hidden>
+						<p><b>Copy it now:</b> it won't be shown again.</p>
+						<div class="copy-row"><code id="new-key-value"></code><button type="button" class="ghost" data-copy="new-key-value">Copy</button></div>
+					</div>
+					<ul class="keys" id="keys"></ul>
+				</section>
+			</div>
+		</main>
+		<script src="/app.js" type="module"></script>
+	</body>
+</html>

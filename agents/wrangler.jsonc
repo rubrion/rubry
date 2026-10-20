@@ -1,0 +1,20 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "rubry-agents",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-09-01",
+	"compatibility_flags": ["nodejs_compat"],
+	// Reached only through the middleware's service binding: no public URL.
+	"workers_dev": false,
+	"observability": { "enabled": true },
+	// Workers AI: the model your agents use until you set a provider on the
+	// settings page. No key needed; billed to your Cloudflare account (with a
+	// free daily allowance).
+	"ai": { "binding": "AI" },
+	"d1_databases": [
+		// Agent memory (threads and messages), used when a request carries
+		// X-Session-Id. Tables are created on first use.
+		// Create it with: npx wrangler d1 create rubry-memory
+		{ "binding": "MEMORY", "database_name": "rubry-memory", "database_id": "REPLACE_WITH_DATABASE_ID" }
+	]
+}
