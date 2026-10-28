@@ -39,6 +39,8 @@ curl -N http://localhost:8787/v1/chat/completions \
   -d '{"model":"auto","stream":true,"messages":[{"role":"user","content":"Write a 6-word slogan for a bike shop"}]}'
 ```
 
+Or let your coding agent do it: add the Rubry MCP server (`claude mcp add --transport http rubry https://docs.rubry.ai/mcp`, or the same URL in Cursor, VS Code, Codex…) together with Cloudflare's (`https://mcp.cloudflare.com/mcp`), and ask for the agent you want. See [docs.rubry.ai/coding-agents](https://docs.rubry.ai/coding-agents/).
+
 Try it without installing anything first: take a key at [example.rubry.ai](https://example.rubry.ai) (a public demo of this template) and connect it on [rubry.ai/chat](https://rubry.ai/chat).
 
 ## Next

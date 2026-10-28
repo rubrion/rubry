@@ -7,7 +7,7 @@
     "dev": "wrangler dev --port 8787",
     "deploy": "wrangler d1 migrations apply rubry-config --remote && wrangler deploy",
     "migrate:local": "wrangler d1 migrations apply rubry-config --local",
-    "check": "tsc --noEmit && wrangler deploy --dry-run",
+    "check": "wrangler types && tsc --noEmit && wrangler deploy --dry-run",
     "types": "wrangler types"
   },
   "devDependencies": {

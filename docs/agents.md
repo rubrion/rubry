@@ -41,7 +41,7 @@ export const lookupOrder = createTool({
 });
 ```
 
-Give it to an agent with `tools: { lookup_order: lookupOrder }`. Secrets a tool needs (an API token) go in `wrangler secret put` and are read with `import { env } from 'cloudflare:workers'`.
+Give it to an agent with `tools: { lookup_order: lookupOrder }`. Secrets a tool needs (an API token) go in `wrangler secret put` and are read with `import { env } from 'cloudflare:workers'`; declare them on `Cloudflare.Env` in `agents/src/env.d.ts`.
 
 ## Models
 
