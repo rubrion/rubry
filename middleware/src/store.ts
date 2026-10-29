@@ -79,12 +79,12 @@ export async function checkKey(env: Env, key: string) {
 // Demo mode: a public sandbox with a published ADMIN_TOKEN.
 export const DEMO = {
 	keyHours: 24,
-	perKey: 30,
+	perKey: 100,
 	perDay: 1000,
 	maxKeys: 200,
 	/** Per network (IP, or its /64) and day: keys made, and requests over all its keys. */
 	keysPerIp: 3,
-	perIp: 60,
+	perIp: 200,
 	/** What a request may carry to the model: its last messages, and their text in all. */
 	messages: 12,
 	chars: 16_000,
