@@ -14,6 +14,8 @@
 
 Optional request header on `/v1`: `X-Session-Id` keeps memory per session and agent, so only the new message needs sending.
 
+Replies carry OpenAI's `usage` (tokens over the planner, every agent and every tool round): in the JSON body, or on the final chunk when streaming.
+
 ## Agents Worker (private)
 
 Served by `createAgentServer` from `@rubrion/mastra-cloudflare`, behind the middleware's service binding. Same `/v1` routes, plus `GET /` (health and agent ids). The middleware sets these headers on every call:
