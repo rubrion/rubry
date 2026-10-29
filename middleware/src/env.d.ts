@@ -13,4 +13,6 @@ interface Env {
 	 * after a day with daily caps (see store.ts).
 	 */
 	DEMO_MODE?: string;
+	/** Rate limit for demo mode (wrangler.jsonc "ratelimits"); optional elsewhere. */
+	BURST?: RateLimit;
 }

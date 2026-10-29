@@ -33,7 +33,7 @@ function render(config) {
 	const demo = !!config.demo;
 	$('demo-note').hidden = !demo;
 	if (demo)
-		$('demo-note').textContent = `Public demo: agents run on the built-in model. Keys last ${config.demo.keyHours} hours and ${config.demo.perKey} messages a day. Deploy your own to set a provider and turn agents on or off.`;
+		$('demo-note').textContent = `Public demo: agents run on the built-in model. Keys last ${config.demo.keyHours} hours and ${config.demo.perKey} messages a day (${config.demo.perIp} a day per network, ${config.demo.keysPerIp} new keys). Deploy your own to set a provider and turn agents on or off.`;
 	for (const el of $('provider').elements) el.disabled = demo;
 	$('endpoint').textContent = config.endpoint;
 	const form = $('provider');

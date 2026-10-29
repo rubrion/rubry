@@ -20,11 +20,14 @@ import {
 	hasProviderKey,
 	isDemo,
 	listKeys,
+	network,
 	pruneDemo,
 	setDisabled,
 	setProvider,
 	takeDemo,
+	takeIp,
 	touchKey,
+	trimDemo,
 } from './store';
 
 const json = (data: unknown, status = 200, headers: HeadersInit = {}) =>
@@ -36,6 +39,9 @@ const CORS = {
 	'access-control-allow-headers': 'authorization, content-type, x-session-id',
 	'access-control-allow-methods': 'GET, POST, OPTIONS',
 };
+
+/** A few requests a minute per network, when the BURST rate limit is bound (demo mode). */
+const burstOk = async (env: Env, ip: string) => !env.BURST || (await env.BURST.limit({ key: ip })).success;
 
 const bearer = (request: Request) => request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
 
@@ -55,8 +61,19 @@ async function openai(request: Request, env: Env, ctx: ExecutionContext, path: s
 	const keyId = await checkKey(env, bearer(request));
 	if (!keyId) return json({ error: { message: 'Invalid API key', type: 'invalid_request_error', code: 'invalid_api_key' } }, 401, CORS);
 	ctx.waitUntil(touchKey(env, keyId));
-	if (isDemo(env) && request.method === 'POST' && !(await takeDemo(env, keyId)))
-		return json({ error: { message: `Demo limit reached: ${DEMO.perKey} requests per key a day. Deploy your own to go further.`, type: 'rate_limit_error', code: 'demo_limit' } }, 429, CORS);
+	const demo = isDemo(env) && request.method === 'POST';
+	let body: BodyInit | null = request.method === 'POST' ? request.body : null;
+	if (demo) {
+		// Per key, per network (however many keys it made) and per day in all.
+		const ip = await network(env, request);
+		const limited = (message: string) => json({ error: { message, type: 'rate_limit_error', code: 'demo_limit' } }, 429, CORS);
+		if (!(await burstOk(env, ip))) return limited('Too many requests: wait a minute.');
+		if (!(await takeIp(env, ip, 'req', DEMO.perIp))) return limited(`Demo limit reached: ${DEMO.perIp} requests per network a day. Deploy your own to go further.`);
+		if (!(await takeDemo(env, keyId))) return limited(`Demo limit reached: ${DEMO.perKey} requests per key a day. Deploy your own to go further.`);
+		const parsed = await request.json().catch(() => null);
+		if (!parsed || typeof parsed !== 'object') return json({ error: { message: 'Invalid JSON body', type: 'invalid_request_error', code: 'invalid_body' } }, 400, CORS);
+		body = JSON.stringify(trimDemo(parsed));
+	}
 
 	// No provider set (always, in demo mode): the agents Worker falls back to Workers AI.
 	const provider = isDemo(env) ? null : await getProvider(env);
@@ -72,7 +89,7 @@ async function openai(request: Request, env: Env, ctx: ExecutionContext, path: s
 	const session = request.headers.get('x-session-id');
 	if (session) headers['x-session-id'] = session;
 
-	const res = await env.AGENTS.fetch(`https://agents${path}`, { method: request.method, headers, body: request.method === 'POST' ? request.body : undefined });
+	const res = await env.AGENTS.fetch(`https://agents${path}`, { method: request.method, headers, body });
 	const out = new Response(res.body, res);
 	for (const [k, v] of Object.entries(CORS)) out.headers.set(k, v);
 	return out;
@@ -133,8 +150,11 @@ async function admin(request: Request, env: Env, path: string) {
 	if (path === '/api/keys' && request.method === 'POST') {
 		const name = String(body.name ?? '').trim().slice(0, 60) || 'API key';
 		if (demo) {
+			const ip = await network(env, request);
+			if (!(await burstOk(env, ip))) return json({ error: 'Too many requests: wait a minute.' }, 429);
 			await pruneDemo(env);
 			if ((await countKeys(env)) >= DEMO.maxKeys) return json({ error: 'The demo is full right now. Try again later, or deploy your own.' }, 429);
+			if (!(await takeIp(env, ip, 'key', DEMO.keysPerIp))) return json({ error: `You made ${DEMO.keysPerIp} keys today, the demo's limit. Use one of them, or deploy your own.` }, 429);
 		}
 		return json(await createKey(env, name));
 	}

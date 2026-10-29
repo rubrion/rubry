@@ -77,12 +77,23 @@ export async function checkKey(env: Env, key: string) {
 }
 
 // Demo mode: a public sandbox with a published ADMIN_TOKEN.
-export const DEMO = { keyHours: 24, perKey: 30, perDay: 1000, maxKeys: 200 };
+export const DEMO = {
+	keyHours: 24,
+	perKey: 30,
+	perDay: 1000,
+	maxKeys: 200,
+	/** Per network (IP, or its /64) and day: keys made, and requests over all its keys. */
+	keysPerIp: 3,
+	perIp: 60,
+	/** What a request may carry to the model: its last messages, and their text in all. */
+	messages: 12,
+	chars: 16_000,
+};
 export const isDemo = (env: Env) => env.DEMO_MODE === 'true';
 
 /** Count one request for the key; false when the key's or the day's cap is reached. */
 export async function takeDemo(env: Env, keyId: string) {
-	const day = new Date().toISOString().slice(0, 10);
+	const day = today();
 	const total = await env.DB.prepare('SELECT COALESCE(SUM(n), 0) AS n FROM usage WHERE day = ?1').bind(day).first<{ n: number }>();
 	if ((total?.n ?? 0) >= DEMO.perDay) return false;
 	const row = await env.DB.prepare(
@@ -93,12 +104,45 @@ export async function takeDemo(env: Env, keyId: string) {
 	return row !== null;
 }
 
+/** The caller's network for the day: a salted hash of its IP, or of its /64 for IPv6. */
+export async function network(env: Env, request: Request) {
+	const ip = request.headers.get('cf-connecting-ip') ?? '';
+	const net = ip.includes(':') ? ip.split(':').slice(0, 4).join(':') : ip;
+	return sha256(`${env.SECRET_KEY ?? ''}|${today()}|${net}`);
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+/** Count one `kind` (key, req) for the network; false when its daily cap is reached. */
+export async function takeIp(env: Env, ip: string, kind: 'key' | 'req', limit: number) {
+	const row = await env.DB.prepare(
+		'INSERT INTO demo_ip (day, ip, kind, n) VALUES (?1, ?2, ?3, 1) ON CONFLICT (day, ip, kind) DO UPDATE SET n = n + 1 WHERE n < ?4 RETURNING n',
+	)
+		.bind(today(), ip, kind, limit)
+		.first<{ n: number }>();
+	return row !== null;
+}
+
+type Message = { role: string; content: string | { type: string; text?: string }[] };
+
+/** A chat request cut to the demo's size: its last messages, oldest dropped (or the last one shortened) past the text cap. */
+export function trimDemo(body: { messages?: Message[] }) {
+	const size = (m: Message) => (typeof m.content === 'string' ? m.content.length : m.content.reduce((n, p) => n + (p.text?.length ?? 0), 0));
+	let messages = (body.messages ?? []).slice(-DEMO.messages);
+	while (messages.length > 1 && messages.reduce((n, m) => n + size(m), 0) > DEMO.chars) messages = messages.slice(1);
+	const last = messages.at(-1);
+	if (last && typeof last.content === 'string' && last.content.length > DEMO.chars) last.content = last.content.slice(-DEMO.chars);
+	if (last && Array.isArray(last.content)) for (const p of last.content) if (p.text && p.text.length > DEMO.chars) p.text = p.text.slice(-DEMO.chars);
+	return { ...body, messages };
+}
+
 /** Drop expired demo keys (and old usage rows). */
 export async function pruneDemo(env: Env) {
 	const cutoff = new Date(Date.now() - DEMO.keyHours * 3600_000).toISOString();
 	await env.DB.batch([
 		env.DB.prepare('DELETE FROM api_keys WHERE created_at < ?1').bind(cutoff),
 		env.DB.prepare('DELETE FROM usage WHERE day < ?1').bind(cutoff.slice(0, 10)),
+		env.DB.prepare('DELETE FROM demo_ip WHERE day < ?1').bind(cutoff.slice(0, 10)),
 	]);
 }
 
