@@ -79,12 +79,17 @@ export async function checkKey(env: Env, key: string) {
 // Demo mode: a public sandbox with a published ADMIN_TOKEN.
 export const DEMO = {
 	keyHours: 24,
-	perKey: 100,
+	perKey: 30,
 	perDay: 1000,
 	maxKeys: 200,
 	/** Per network (IP, or its /64) and day: keys made, and requests over all its keys. */
 	keysPerIp: 3,
-	perIp: 200,
+	perIp: 60,
+	/** Spend a day, in US dollars, priced from the replies' token usage (the built-in model's rates). */
+	budgetUsd: 1,
+	price: { input: 0.1, output: 0.3 },
+	/** What a reply without `usage` counts as. */
+	unpriced: { prompt_tokens: 10_000, completion_tokens: 1_000 },
 	/** What a request may carry to the model: its last messages, and their text in all. */
 	messages: 12,
 	chars: 16_000,
@@ -136,6 +141,19 @@ export function trimDemo(body: { messages?: Message[] }) {
 	return { ...body, messages };
 }
 
+/** Micro-dollars left of today's demo budget. */
+export async function budgetLeft(env: Env) {
+	const row = await env.DB.prepare('SELECT micro FROM demo_spend WHERE day = ?1').bind(today()).first<{ micro: number }>();
+	return DEMO.budgetUsd * 1e6 - (row?.micro ?? 0);
+}
+
+/** Add a reply's cost (OpenAI `usage`) to today's spend. */
+export async function spend(env: Env, usage: { prompt_tokens?: number; completion_tokens?: number }) {
+	const micro = Math.ceil((usage.prompt_tokens ?? 0) * DEMO.price.input + (usage.completion_tokens ?? 0) * DEMO.price.output);
+	if (!micro) return;
+	await env.DB.prepare('INSERT INTO demo_spend (day, micro) VALUES (?1, ?2) ON CONFLICT (day) DO UPDATE SET micro = micro + ?2').bind(today(), micro).run();
+}
+
 /** Drop expired demo keys (and old usage rows). */
 export async function pruneDemo(env: Env) {
 	const cutoff = new Date(Date.now() - DEMO.keyHours * 3600_000).toISOString();
@@ -143,6 +161,7 @@ export async function pruneDemo(env: Env) {
 		env.DB.prepare('DELETE FROM api_keys WHERE created_at < ?1').bind(cutoff),
 		env.DB.prepare('DELETE FROM usage WHERE day < ?1').bind(cutoff.slice(0, 10)),
 		env.DB.prepare('DELETE FROM demo_ip WHERE day < ?1').bind(cutoff.slice(0, 10)),
+		env.DB.prepare('DELETE FROM demo_spend WHERE day < ?1').bind(cutoff.slice(0, 10)),
 	]);
 }
 

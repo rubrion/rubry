@@ -9,6 +9,7 @@
 //   everything else                    the config page (client/)
 import { sameSecret } from './crypto';
 import {
+	budgetLeft,
 	checkKey,
 	clearProvider,
 	countKeys,
@@ -24,6 +25,7 @@ import {
 	pruneDemo,
 	setDisabled,
 	setProvider,
+	spend,
 	takeDemo,
 	takeIp,
 	touchKey,
@@ -68,6 +70,7 @@ async function openai(request: Request, env: Env, ctx: ExecutionContext, path: s
 		const ip = await network(env, request);
 		const limited = (message: string) => json({ error: { message, type: 'rate_limit_error', code: 'demo_limit' } }, 429, CORS);
 		if (!(await burstOk(env, ip))) return limited('Too many requests: wait a minute.');
+		if ((await budgetLeft(env)) <= 0) return limited('The demo has used up today’s budget. Try again tomorrow, or deploy your own.');
 		if (!(await takeIp(env, ip, 'req', DEMO.perIp))) return limited(`Demo limit reached: ${DEMO.perIp} requests per network a day. Deploy your own to go further.`);
 		if (!(await takeDemo(env, keyId))) return limited(`Demo limit reached: ${DEMO.perKey} requests per key a day. Deploy your own to go further.`);
 		const parsed = await request.json().catch(() => null);
@@ -90,7 +93,24 @@ async function openai(request: Request, env: Env, ctx: ExecutionContext, path: s
 	if (session) headers['x-session-id'] = session;
 
 	const res = await env.AGENTS.fetch(`https://agents${path}`, { method: request.method, headers, body });
-	const out = new Response(res.body, res);
+	let reply = res.body;
+	if (demo && reply) {
+		// Price the reply from its `usage` (in the body, or the last chunk of a stream).
+		const [mine, theirs] = reply.tee();
+		reply = theirs;
+		ctx.waitUntil(
+			new Response(mine)
+				.text()
+				.then((t) => {
+					const last = [...t.matchAll(/"usage":(\{[^}]*\})/g)].at(-1)?.[1];
+					if (last) return spend(env, JSON.parse(last));
+					// An agents Worker that doesn't report usage: count a long reply.
+					if (res.ok) return spend(env, DEMO.unpriced);
+				})
+				.catch(() => undefined),
+		);
+	}
+	const out = new Response(reply, res);
 	for (const [k, v] of Object.entries(CORS)) out.headers.set(k, v);
 	return out;
 }

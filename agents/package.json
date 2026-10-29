@@ -10,7 +10,7 @@
     "types": "wrangler types"
   },
   "dependencies": {
-    "@rubrion/mastra-cloudflare": "^0.1.0"
+    "@rubrion/mastra-cloudflare": "^0.2.0"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

@@ -23,4 +23,8 @@ export default createAgentServer({
 	// binding is the only way in anyway (workers_dev is off).
 	apiKey: (e: Env) => e.AGENTS_API_KEY,
 	defaultModel: (e: Env) => workersAI(e.AI, DEFAULT_MODEL, { thinking: false }),
+	// A public sandbox (DEMO_MODE, as on the middleware) keeps each request
+	// small: one agent per message and two tool rounds.
+	maxSteps: (e: Env) => (e.DEMO_MODE === 'true' ? 2 : 5),
+	maxAgents: (e: Env) => (e.DEMO_MODE === 'true' ? 1 : 3),
 });
