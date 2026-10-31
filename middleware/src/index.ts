@@ -16,6 +16,7 @@ import {
 	createKey,
 	deleteKey,
 	DEMO,
+	getCallerModel,
 	getDisabled,
 	getProvider,
 	hasProviderKey,
@@ -23,6 +24,7 @@ import {
 	listKeys,
 	network,
 	pruneDemo,
+	setCallerModel,
 	setDisabled,
 	setProvider,
 	spend,
@@ -79,7 +81,8 @@ async function openai(request: Request, env: Env, ctx: ExecutionContext, path: s
 	}
 
 	// No provider set (always, in demo mode): the agents Worker falls back to Workers AI.
-	const provider = isDemo(env) ? null : await getProvider(env);
+	// With "Let callers bring their model" on, a caller's own provider wins.
+	const provider = isDemo(env) ? null : ((await callerProvider(request, env)) ?? (await getProvider(env)));
 	const disabled = new Set(await getDisabled(env));
 	const on = (await agentIds(env)).filter((id) => !disabled.has(id));
 
@@ -115,6 +118,16 @@ async function openai(request: Request, env: Env, ctx: ExecutionContext, path: s
 	return out;
 }
 
+/** The caller's X-Provider-* headers, when the owner allows them and they're complete (https only). */
+async function callerProvider(request: Request, env: Env) {
+	const h = request.headers;
+	const baseURL = h.get('x-provider-base-url') ?? '';
+	const model = h.get('x-provider-model') ?? '';
+	const apiKey = h.get('x-provider-key') ?? '';
+	if (!/^https:\/\//.test(baseURL) || !model || !apiKey) return null;
+	return (await getCallerModel(env)) ? { baseURL, model, apiKey } : null;
+}
+
 async function admin(request: Request, env: Env, path: string) {
 	if (!env.ADMIN_TOKEN) return json({ error: 'ADMIN_TOKEN is not set' }, 503);
 	// A public sandbox publishes its admin token on the sign-in screen.
@@ -123,13 +136,14 @@ async function admin(request: Request, env: Env, path: string) {
 	const body = request.method === 'POST' || request.method === 'PUT' ? ((await request.json().catch(() => ({}))) as Record<string, unknown>) : {};
 	const demo = isDemo(env);
 	// The sandbox's admin token is public: only keys can be made there.
-	if (demo && (path === '/api/provider' || path === '/api/agents') && request.method !== 'GET')
+	if (demo && (path === '/api/provider' || path === '/api/agents' || path === '/api/caller-model') && request.method !== 'GET')
 		return json({ error: 'This is a public demo: the provider and agents are fixed. Deploy your own to change them.' }, 403);
 
 	if (path === '/api/config' && request.method === 'GET') {
-		const [provider, hasKey, disabled, keys, models] = await Promise.all([
+		const [provider, hasKey, callerModel, disabled, keys, models] = await Promise.all([
 			getProvider(env).catch(() => null),
 			hasProviderKey(env),
+			getCallerModel(env),
 			getDisabled(env),
 			listKeys(env),
 			env.AGENTS.fetch('https://agents/v1/models', { headers: agentsAuth(env) })
@@ -141,6 +155,7 @@ async function admin(request: Request, env: Env, path: string) {
 			demo: demo ? DEMO : null,
 			endpoint: `${new URL(request.url).origin}/v1`,
 			provider: provider ? { baseURL: provider.baseURL, model: provider.model, hasKey } : null,
+			callerModel,
 			agents: models.map((m) => ({ id: m.id, name: m.name, description: m.description, enabled: !disabled.includes(m.id) })),
 			// In the demo everyone shares one admin token: don't list each other's keys.
 			keys: demo ? [] : keys,
@@ -158,6 +173,11 @@ async function admin(request: Request, env: Env, path: string) {
 
 	if (path === '/api/provider' && request.method === 'DELETE') {
 		await clearProvider(env);
+		return json({ ok: true });
+	}
+
+	if (path === '/api/caller-model' && request.method === 'PUT') {
+		await setCallerModel(env, body.on === true);
 		return json({ ok: true });
 	}
 

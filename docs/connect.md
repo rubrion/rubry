@@ -6,6 +6,8 @@ Your endpoint is the middleware's URL plus `/v1` (shown on the settings page), a
 
 On [rubry.ai/chat](https://rubry.ai/chat), open the agent menu and pick **Connect your agent**. Paste the endpoint and the key and give it a name. Your agent joins the menu and is selected. The key stays in an encrypted cookie in your browser, and your agent runs on your provider, outside Rubry's daily limits.
 
+Published it on the [Agent Hub](https://rubry.ai/agents) with a public endpoint? Turn on **Let callers bring their model** in the settings and tick **Works with Rubry's model** on its listing: visitors who wire it then run it on Rubry's model, from their own daily credit, so trying your agent costs you nothing.
+
 ## Open WebUI
 
 Settings → Connections → OpenAI API: URL = your endpoint, key = your API key. Your agents (and `auto`) appear as models.

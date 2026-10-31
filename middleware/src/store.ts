@@ -42,6 +42,18 @@ export async function hasProviderKey(env: Env) {
 	return !!raw && !!JSON.parse(raw).key;
 }
 
+/**
+ * Off unless the owner turns it on: a caller (such as rubry.ai) may then send
+ * its own model provider in X-Provider-* headers, and pays for the tokens.
+ */
+export async function getCallerModel(env: Env) {
+	return (await get(env.DB, 'caller_model')) === '1';
+}
+
+export async function setCallerModel(env: Env, on: boolean) {
+	await set(env.DB, 'caller_model', on ? '1' : '0').run();
+}
+
 export async function getDisabled(env: Env): Promise<string[]> {
 	return JSON.parse((await get(env.DB, 'disabled_agents')) ?? '[]');
 }

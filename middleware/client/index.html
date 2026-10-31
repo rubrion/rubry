@@ -60,6 +60,10 @@
 						<button type="button" class="ghost" id="builtin" hidden>Use built-in Workers AI</button>
 					</div>
 					<p class="note" id="provider-note" role="status"></p>
+					<label class="toggle">
+						<input type="checkbox" id="caller-model" />
+						<span><b>Let callers bring their model</b><small>A caller such as rubry.ai may send its own model in <code>X-Provider-*</code> headers and pays for those tokens, so people can try your agent on the Agent Hub at no cost to you. Your tools and secrets stay here. Off: every call uses the provider above.</small></span>
+					</label>
 				</form>
 
 				<section class="card">

@@ -42,6 +42,7 @@ function render(config) {
 	form.apiKey.value = '';
 	$('provider-state').textContent = config.provider ? `Using ${config.provider.model} at ${new URL(config.provider.baseURL).host}.` : 'Using the built-in Workers AI model.';
 	$('builtin').hidden = !config.provider;
+	$('caller-model').checked = !!config.callerModel;
 	$('key-state').textContent = !config.secretKeySet
 		? 'Set the SECRET_KEY secret on this Worker before saving a key.'
 		: config.provider?.hasKey
@@ -127,6 +128,11 @@ $('provider').addEventListener('submit', async (e) => {
 	} catch (err) {
 		$('provider-note').textContent = err.message;
 	}
+});
+
+$('caller-model').addEventListener('change', async (e) => {
+	await api('/api/caller-model', { method: 'PUT', body: JSON.stringify({ on: e.target.checked }) });
+	$('provider-note').textContent = e.target.checked ? 'Callers may bring their model.' : 'Every call uses your provider.';
 });
 
 $('builtin').addEventListener('click', async () => {
