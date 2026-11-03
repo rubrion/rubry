@@ -58,7 +58,7 @@ tools: { browse: browseTool({ browser: () => env.BROWSER }) },
 inputProcessors: [forgetResults(['browse'])], // a page's text isn't resent with every later message
 ```
 
-An agent that doesn't import `browseTool` bundles no browser and needs no binding. The Rubry MCP's `scaffold_agent` writes either one for you (`accepts_documents`, `browses_web`). More tools (reading stored files, background jobs): [the library](https://github.com/rubrion/mastra-cloudflare#tools).
+An agent that doesn't import `browseTool` bundles no browser and needs no binding. Published on the Agent Hub with "Let callers bring their model" on? `gatewayBrowseTool({ fallback: browseTool({ browser: () => env.BROWSER }) })` uses Rubry's browser when a visitor runs it on Rubry's model (they pay, not you), and yours otherwise. The Rubry MCP's `scaffold_agent` writes either one for you (`accepts_documents`, `browses_web`). More tools (reading stored files, background jobs): [the library](https://github.com/rubrion/mastra-cloudflare#tools).
 
 ## Models
 
