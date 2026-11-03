@@ -4,7 +4,7 @@
 
 | Route | Auth | |
 |---|---|---|
-| `GET /v1/models` | `Bearer rk_…` | `auto` (when more than one agent is on) and each agent that is on |
+| `GET /v1/models` | `Bearer rk_…` | `auto` (when more than one agent is on) and each agent that is on, with `capabilities` (`["files"]`) when it declares any ([agents](agents.md#what-an-agent-takes-and-uses)) |
 | `POST /v1/chat/completions` | `Bearer rk_…` | OpenAI chat completions; `stream: true` for SSE. `model`: an agent id or `auto` |
 | `GET /api/config` | `Bearer ADMIN_TOKEN` | endpoint, provider (without its key), agents, API keys |
 | `PUT /api/provider` | `Bearer ADMIN_TOKEN` | `{ baseURL, model, apiKey? }` (omit `apiKey` to keep the stored one) |
