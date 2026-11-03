@@ -43,6 +43,23 @@ export const lookupOrder = createTool({
 
 Give it to an agent with `tools: { lookup_order: lookupOrder }`. Secrets a tool needs (an API token) go in `wrangler secret put` and are read with `import { env } from 'cloudflare:workers'`; declare them on `Cloudflare.Env` in `agents/src/env.d.ts`.
 
+## What an agent takes and uses
+
+Each agent gets only what its spec lists. Leave out what it has no use for.
+
+- **Documents**: `capabilities: ['files']` (as on the writer) lists the agent in `/v1/models` as taking files; rubry.ai then shows the paperclip and sends a document's text in a `<document name="…">` block. Without it, no paperclip.
+- **Web pages in a real browser**: the researcher's `fetch_page` is a plain fetch, free. For pages that need JavaScript, use the library's `browseTool` (Cloudflare Browser Run, billed by browser time): `npm install @cloudflare/puppeteer`, add `"browser": { "binding": "BROWSER" }` to `agents/wrangler.jsonc`, then
+
+```ts
+import { forgetResults } from '@rubrion/mastra-cloudflare';
+import { browseTool } from '@rubrion/mastra-cloudflare/browser';
+
+tools: { browse: browseTool({ browser: () => env.BROWSER }) },
+inputProcessors: [forgetResults(['browse'])], // a page's text isn't resent with every later message
+```
+
+An agent that doesn't import `browseTool` bundles no browser and needs no binding. The Rubry MCP's `scaffold_agent` writes either one for you (`accepts_documents`, `browses_web`). More tools (reading stored files, background jobs): [the library](https://github.com/rubrion/mastra-cloudflare#tools).
+
 ## Models
 
 By default every agent uses the provider set on the settings page, or, when none is set, the Workers AI model in `agents/src/index.ts` (`DEFAULT_MODEL`, Gemma 4; it must support tool calls). An agent can use its own:
